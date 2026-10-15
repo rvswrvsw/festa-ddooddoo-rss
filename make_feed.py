@@ -14,7 +14,7 @@ from xml.sax.saxutils import escape
 BASE = "https://www.festa-ddooddoo.com/board/"
 LIST_URL = BASE + "board.asp?BoardID=Notice&searchtext=&page={page}"
 PAGES = 2  # 페이지당 10개
-OUT = Path(__file__).parent / "docs" / "feed.xml"
+OUT_DIR = Path(__file__).parent / "public"
 FEED_URL = "https://rvswrvsw.github.io/festa-ddooddoo-rss/feed.xml"
 KST = timezone(timedelta(hours=9))
 
@@ -109,13 +109,105 @@ def build_rss(items):
     return "\n".join(out)
 
 
+HTML_HEAD = """<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>뚜벅뚜벅 축제 공지</title>
+<link rel="alternate" type="application/rss+xml" title="뚜벅뚜벅 축제 공지사항" href="feed.xml">
+<style>
+:root {
+  --bg: #f6f7f9; --card: #fff; --text: #1d2129; --muted: #6b7280;
+  --line: #e5e7eb; --accent: #2563eb; --accent-bg: #eff4ff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111317; --card: #1b1e24; --text: #e6e8eb; --muted: #9aa1ac;
+    --line: #2c313a; --accent: #7aa7ff; --accent-bg: #1e2a44;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 20px; }
+h1 { font-size: 1.35rem; margin: 0; line-height: 1.3; }
+.sub { color: var(--muted); font-size: .85rem; margin: 4px 0 0; }
+.rss {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+  border-radius: 999px; background: var(--accent-bg); color: var(--accent);
+  font-weight: 600; font-size: .9rem; text-decoration: none; white-space: nowrap;
+}
+.rss svg { width: 16px; height: 16px; fill: currentColor; }
+.list { display: grid; gap: 10px; }
+details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+summary { list-style: none; cursor: pointer; padding: 14px 44px 14px 16px; position: relative; }
+summary::-webkit-details-marker { display: none; }
+summary::after {
+  content: ""; position: absolute; right: 18px; top: 50%; width: 8px; height: 8px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg); transition: transform .15s;
+}
+details[open] summary::after { transform: translateY(-30%) rotate(-135deg); }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.date { display: block; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.title { display: block; font-weight: 600; margin-top: 2px; }
+.body { padding: 4px 16px 16px; border-top: 1px solid var(--line); font-size: .95rem; }
+.body img { max-width: 100%; height: auto; }
+.body table { display: block; overflow-x: auto; border-collapse: collapse; max-width: 100%; }
+.body td, .body th { border: 1px solid var(--line); padding: 4px 8px; }
+.body a { color: var(--accent); }
+.orig { display: inline-block; margin-top: 12px; color: var(--accent); font-size: .9rem; font-weight: 600; text-decoration: none; }
+footer { margin-top: 28px; color: var(--muted); font-size: .8rem; text-align: center; }
+footer a { color: inherit; }
+</style>
+</head>
+"""
+
+RSS_ICON = ('<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="13" r="2"/>'
+            '<path d="M1 6.5v2A6.5 6.5 0 0 1 7.5 15h2A8.5 8.5 0 0 0 1 6.5zm0-5v2A11.5 11.5 0 0 1 '
+            '12.5 15h2A13.5 13.5 0 0 0 1 1.5z"/></svg>')
+
+
+def build_html(items):
+    now = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
+    cards = []
+    for it in items:
+        cards.append(
+            "<details>"
+            f'<summary><time class="date" datetime="{it["date"]}">{it["date"]}</time>'
+            f'<span class="title">{escape(it["title"])}</span></summary>'
+            f'<div class="body">{it["body"]}'
+            f'<a class="orig" href="{escape(it["link"])}" target="_blank" rel="noopener">원문 보기 →</a>'
+            "</div></details>"
+        )
+    return (
+        HTML_HEAD
+        + '<body><div class="wrap"><header><div>'
+        + "<h1>차 없는 잠수교 뚜벅뚜벅 축제 공지사항</h1>"
+        + f'<p class="sub">최근 {len(items)}개 · {now} KST 갱신</p></div>'
+        + f'<a class="rss" href="feed.xml">{RSS_ICON}RSS 구독</a></header>'
+        + '<main class="list">' + "\n".join(cards) + "</main>"
+        + f'<footer>비공식 미러 · 출처 <a href="{escape(BASE + "board.asp")}">festa-ddooddoo.com</a></footer>'
+        + "</div></body></html>\n"
+    )
+
+
 def main():
     items = collect()
     if not items:
         sys.exit("게시물을 하나도 못 찾음 - 사이트 구조 변경 또는 차단 확인 필요")
-    OUT.parent.mkdir(exist_ok=True)
-    OUT.write_text(build_rss(items), encoding="utf-8")
-    print(f"{len(items)} items -> {OUT}")
+    OUT_DIR.mkdir(exist_ok=True)
+    (OUT_DIR / "feed.xml").write_text(build_rss(items), encoding="utf-8")
+    (OUT_DIR / "index.html").write_text(build_html(items), encoding="utf-8")
+    print(f"{len(items)} items -> {OUT_DIR}/feed.xml, index.html")
 
 
 if __name__ == "__main__":
